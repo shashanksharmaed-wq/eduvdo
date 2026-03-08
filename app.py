@@ -45,7 +45,7 @@ def find_educational_video(query, api_key, language):
 # --- 4. APP INTERFACE & SETUP ---
 st.set_page_config(page_title="Premium Curriculum Engine", layout="wide")
 st.title("🏆 Premium Curriculum Master Engine")
-st.markdown("### Surpassing LEAD & Chrysalis | High-Density Scripting | Micro-Teaching")
+st.markdown("### Strict Grounding | High-Density Scripting | Micro-Teaching")
 
 if not OPENAI_KEY or not YOUTUBE_KEY:
     with st.sidebar:
@@ -66,7 +66,7 @@ if uploaded_file:
     st.markdown("#### 🎯 Lesson Settings")
     col_lang, col_class, col_age = st.columns(3)
     
-    target_lang = col_lang.selectbox("Medium of Instruction", ["English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali", "Kannada"])
+    target_lang = col_lang.selectbox("Medium of Instruction", ["Hindi", "English", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali", "Kannada"])
     target_class = col_class.selectbox("Class / Grade", ["Pre-Primary (KG)", "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8"])
     target_age = col_age.selectbox("Student Age Group", ["3-5 years", "6-8 years", "9-11 years", "12-14 years"])
 
@@ -75,55 +75,69 @@ if uploaded_file:
     start_p = c1.number_input("Start Page", 1, total_pages, 1)
     end_p = c2.number_input("End Page (Optional)", start_p, total_pages, start_p)
 
+    # Extract text immediately so user can verify it
+    text_context = ""
+    for i in range(start_p - 1, end_p):
+        text_context += doc[i].get_text()
+
+    # --- NEW: SANITY CHECK FOR TEXT EXTRACTION ---
+    with st.expander("🔍 Debug: Verify Extracted Text (Click to expand)"):
+        if text_context.strip() == "":
+            st.error("⚠️ NO TEXT EXTRACTED! The PDF might be scanned images. The AI will hallucinate if you proceed. Please upload a digital text PDF.")
+        else:
+            st.write(text_context)
+
     if st.button(f"🚀 Generate Premium {target_lang} Manual for {target_class}"):
         if not OPENAI_KEY or not YOUTUBE_KEY:
             st.error("API Keys required to proceed.")
+        elif text_context.strip() == "":
+             st.error("Cannot generate plan: No readable text found on these pages.")
         else:
-            with st.spinner(f"Writing High-Density Script... Integrating Micro-Teaching Skills..."):
-                
-                text_context = ""
-                for i in range(start_p - 1, end_p):
-                    text_context += doc[i].get_text()
+            with st.spinner(f"Writing strictly grounded Script... Forcing adherence to textbook content ONLY..."):
                 
                 client = OpenAI(api_key=OPENAI_KEY)
                 
-                # --- THE ULTIMATE MASTER PROMPT ---
+                # --- THE STRICTLY GROUNDED MASTER PROMPT ---
                 prompt = f"""
-                You are a Master Curriculum Architect designing a premium teacher's manual that MUST SURPASS LEAD School, Chrysalis, and EDAC standards. 
+                You are a Master Curriculum Architect designing a premium teacher's manual. 
                 Create a 60-minute lesson plan in {target_lang.upper()} for {target_class} (Age: {target_age}).
                 
-                CRITICAL RULE ON TIME: You CANNOT have 15 minutes of time pass with only 2 lines of dialogue. For EVERY 5-minute block, you MUST write highly dense dialogue, actions, and questions that would physically take 5 minutes to say and do. 
-                
+                CRITICAL GROUNDING RULE (ANTI-HALLUCINATION):
+                You MUST base the entire lesson, all examples, character names, and stories STRICTLY on the "Book Text Context" provided below. 
+                DO NOT invent outside examples. DO NOT bring in unrelated concepts (like 'snow-capped mountains') if they do not exist in the text.
+                If the provided text is short, stretch the 60 minutes by writing deeper probing questions, longer student discussions, and extended games based ONLY on the existing text, rather than hallucinating new topics.
+
                 FORMAT EVERY CORE SCRIPT BLOCK EXACTLY LIKE THIS:
                 **[Time Marker: e.g., Minute 15 - 18]**
                 * **Teacher Does:** [Exact physical action]
-                * **Teacher Says ({target_lang}):** "[Minimum 4 to 5 full sentences of exact dialogue]"
+                * **Teacher Says ({target_lang}):** "[Minimum 4 to 5 full sentences of exact dialogue STRICTLY related to the text]"
                 * **Anticipated Student Response:** "[What the kids will say]"
                 * **Remediation:** "[What to say if the kids get it wrong]"
                 * **Board Work:** "[Exactly what to write/draw on the blackboard right now]"
-                * **Micro-Teaching Skill Applied:** "[Name the specific teaching skill used here, e.g., Skill of Reinforcement]"
+                * **Micro-Teaching Skill Applied:** "[Name the specific teaching skill used here]"
 
                 FULL LESSON STRUCTURE:
-                1. MICRO-TEACHING FOCUS: List 2 specific micro-teaching skills (e.g., Skill of Probing Questions, Skill of Stimulus Variation) for the teacher to practice today and a quick 1-sentence tip for each.
-                2. THE HOOK (Min 0-5): A full 4-8 line {target_lang} rhyme or detailed 2-minute story to grab {target_age} olds. Include physical actions.
-                3. DISCOVERY & PRE-ASSESSMENT (Min 5-15): Provide 5 deep questions using the format above.
-                4. CORE INSTRUCTION (Min 15-40): Break this into strictly 3-to-4 minute micro-blocks. YOU MUST FILL THE TIME WITH DIALOGUE. Use the format above for EVERY block.
-                5. PLAY-BASED ACTIVITY (Min 40-52): Explicit {target_lang} game rules. Step 1, Step 2, Step 3. What the teacher says to start the game.
+                1. MICRO-TEACHING FOCUS: List 2 specific micro-teaching skills to practice today.
+                2. THE HOOK (Min 0-5): A rhyme or story directly introducing the specific characters/theme in the text.
+                3. DISCOVERY & PRE-ASSESSMENT (Min 5-15): 5 deep questions using the format above.
+                4. CORE INSTRUCTION (Min 15-40): Break into 3-to-4 minute micro-blocks. FILL THE TIME WITH DIALOGUE based *only* on the text.
+                5. PLAY-BASED ACTIVITY (Min 40-52): Explicit {target_lang} game rules based on the text.
                 6. WRAP-UP & TLM (Min 52-60): Specific local items needed. Final concluding dialogue.
                 7. PEDAGOGY MAPPING: Show Adhiti, Bodha, Abhyasa, Prayoga, Prasar.
                 8. MIND MAP: Bulleted text hierarchy (->) summarizing the lesson.
-                9. BOARD SNAPSHOT & ASSESSMENT: 3 MCQs, 2 Short Answers, 1 Creative Task.
+                9. BOARD SNAPSHOT & ASSESSMENT: 3 MCQs, 2 Short Answers, 1 Creative Task based ONLY on the text.
 
-                Book Text Context: {text_context[:8000]}
+                Book Text Context: 
+                {text_context[:8000]}
                 
                 End with this exact tag format:
-                SEARCH_QUERY: [Specific Topic in English]
+                SEARCH_QUERY: [Specific Topic in English based on the text]
                 """
 
-                # Using gpt-4o for maximum instruction following and verbose output
                 response = client.chat.completions.create(
                     model="gpt-4o", 
                     messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2, # Lowered temperature to force the AI to be literal and stick to facts
                     max_tokens=4000 
                 )
                 
@@ -135,7 +149,7 @@ if uploaded_file:
                     video_query = parts[1].strip()
                 else:
                     plan_content = full_output
-                    video_query = f"Topic page {start_p} lesson"
+                    video_query = f"{target_class} Hindi lesson page {start_p}"
 
                 v_url = find_educational_video(video_query, YOUTUBE_KEY, target_lang)
                 
@@ -144,7 +158,7 @@ if uploaded_file:
                 col_plan, col_vid = st.columns([2, 1])
                 
                 with col_plan:
-                    st.success("High-Density Premium Manual Ready!")
+                    st.success("Strictly Grounded Premium Manual Ready!")
                     st.markdown(plan_content)
                     
                     pdf = ScriptedPDF()
@@ -156,7 +170,7 @@ if uploaded_file:
                     st.download_button(
                         label="📥 Download Premium PDF", 
                         data=pdf_bytes, 
-                        file_name=f"Premium_Script_{target_class}_P{start_p}.pdf"
+                        file_name=f"Grounded_Script_{target_class}_P{start_p}.pdf"
                     )
                     st.caption("💡 Tip: Use **Ctrl + P** on this webpage to print/save perfectly with regional Hindi/Marathi fonts!")
 
@@ -167,5 +181,3 @@ if uploaded_file:
                         st.write(f"[Open on YouTube]({v_url})")
                     else:
                         st.warning("No matching educational video found.")
-else:
-    st.info("Waiting for textbook PDF upload...")
