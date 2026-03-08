@@ -2,146 +2,136 @@ import streamlit as st
 import fitz  # PyMuPDF
 from openai import OpenAI
 from googleapiclient.discovery import build
+from fpdf import FPDF
 
-# --- Page Configuration ---
-st.set_page_config(page_title="Hindi AI School Planner", layout="wide")
-st.title("📚 AI Lesson Planner (हिंदी)")
+# --- PDF Generation Class ---
+class LessonPDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'School Lesson Plan: 5E & Panchadi Model', 0, 1, 'C')
+        self.ln(5)
 
-# --- Sidebar Configuration ---
-with st.sidebar:
-    st.header("🔑 API Setup")
-    openai_key = st.text_input("OpenAI API Key", type="password")
-    youtube_key = st.text_input("YouTube API Key", type="password")
-    st.divider()
-    
-    st.header("⚙️ Plan Settings")
-    # Control the length/detail of the lesson plan
-    detail_level = st.select_slider(
-        "Select Detail Level (विस्तार स्तर):",
-        options=["Brief", "Standard", "Comprehensive"],
-        value="Standard"
-    )
-    
-    length_map = {
-        "Brief": "Keep it short (max 200 words). Focus on 3 main points only.",
-        "Standard": "Provide a balanced 1-page plan with summary and activity.",
-        "Comprehensive": "Detailed 3-page style plan with minute-by-minute breakdown and 5 quiz questions."
-    }
+    def chapter_title(self, title):
+        self.set_font('Arial', 'B', 14)
+        self.set_fill_color(230, 230, 230)
+        self.cell(0, 10, title, 0, 1, 'L', 1)
+        self.ln(4)
 
-# --- Core Functions ---
-def get_pdf_structure(pdf_file):
-    """Detects Chapters or provides a way to read pages."""
-    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    toc = doc.get_toc() # Table of Contents
-    if toc:
-        chapters = [{"title": f"Ch {lvl}: {t}", "page": p - 1} for lvl, t, p in toc if lvl <= 2]
-        return chapters, doc
-    return None, doc
+    def add_content(self, content):
+        self.set_font('Arial', '', 11)
+        # Replacing non-latin characters for PDF compatibility (Latin-1)
+        # Note: For full Hindi PDF support, custom Unicode fonts are needed.
+        self.multi_cell(0, 7, content.encode('latin-1', 'ignore').decode('latin-1'))
+        self.ln()
 
-def find_hindi_video(query, api_key):
-    """Searches YouTube for Hindi educational content."""
+# --- Functions ---
+def find_youtube_video(query, api_key):
     try:
         youtube = build('youtube', 'v3', developerKey=api_key)
-        search_query = f"{query} educational lesson in Hindi"
         request = youtube.search().list(
-            q=search_query,
-            part="snippet",
-            type="video",
-            relevanceLanguage="hi",
-            maxResults=1
+            q=query + " educational lesson Hindi",
+            part="snippet", type="video", relevanceLanguage="hi", maxResults=1
         )
         response = request.execute()
         if response['items']:
-            video_id = response['items'][0]['id']['videoId']
-            return f"https://www.youtube.com/watch?v={video_id}"
-    except Exception as e:
-        st.error(f"YouTube Error: {e}")
+            return f"https://www.youtube.com/watch?v={response['items'][0]['id']['videoId']}"
+    except:
+        return None
     return None
 
-# --- Main App Logic ---
-uploaded_file = st.file_uploader("Upload School Book (PDF)", type="pdf")
+# --- UI Setup ---
+st.set_page_config(page_title="Pro Pedagogy Planner", layout="wide")
+st.title("🏫 Professional Lesson Planner (5E + Panchadi)")
+st.markdown("### Focus: 165 Days | 45-60 Mins | Play-Based & TLM")
+
+with st.sidebar:
+    st.header("🔑 API Credentials")
+    openai_key = st.text_input("OpenAI API Key", type="password")
+    youtube_key = st.text_input("YouTube API Key", type="password")
+    st.divider()
+    st.info("This tool aligns lessons with NCF guidelines and international pedagogical standards.")
+
+# --- File Processing ---
+uploaded_file = st.file_uploader("Upload Textbook (PDF)", type="pdf")
 
 if uploaded_file:
-    chapters, doc = get_pdf_structure(uploaded_file)
+    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+    total_pages = len(doc)
     
-    # Selection Mode
-    st.divider()
-    mode = st.radio("How would you like to select the content?", ["Select Chapter", "Manual Page Range"])
+    # Pacing Logic
+    target_days = 165
+    pages_per_day = round(total_pages / target_days, 1)
     
-    chapter_text = ""
-    topic_name = ""
+    st.sidebar.success(f"Pacing: Cover ~{pages_per_day} pages/day to finish in {target_days} days.")
 
-    if mode == "Select Chapter" and chapters:
-        selected = st.selectbox("Choose a Chapter:", chapters, format_func=lambda x: x['title'])
-        topic_name = selected['title']
-        start_p = selected['page']
-        # Read up to 8 pages from chapter start
-        for i in range(start_p, min(start_p + 8, len(doc))):
-            chapter_text += doc[i].get_text()
-    else:
-        if mode == "Select Chapter":
-            st.warning("No Table of Contents found. Using Manual Page Range instead.")
-        
-        c1, c2 = st.columns(2)
-        start_page = c1.number_input("Start Page", 1, len(doc), 1)
-        end_page = c2.number_input("End Page", 1, len(doc), min(start_page + 5, len(doc)))
-        topic_name = f"Pages {start_page} to {end_page}"
-        for i in range(start_page - 1, end_page):
-            chapter_text += doc[i].get_text()
+    # Selection
+    c1, c2 = st.columns(2)
+    start_p = c1.number_input("Start Page", 1, total_pages, 1)
+    end_p = c2.number_input("End Page", 1, total_pages, min(start_p + 2, total_pages))
 
-    # --- Generation Trigger ---
-    if st.button("Generate Hindi Lesson Plan & Video"):
+    if st.button("Generate Professional Lesson Plan"):
         if not openai_key or not youtube_key:
-            st.error("Please enter both API keys in the sidebar!")
+            st.error("Please provide both API Keys.")
         else:
-            with st.spinner("Processing PDF and searching for videos..."):
+            with st.spinner("Analyzing text and applying pedagogical frameworks..."):
+                # Extract Text
+                context_text = ""
+                for i in range(start_p - 1, end_p):
+                    context_text += doc[i].get_text()
+
                 client = OpenAI(api_key=openai_key)
                 
-                # Instruction to AI
+                # High-Depth Prompt
                 prompt = f"""
-                You are a professional teacher. Based on the text below, create a {detail_level} lesson plan in HINDI.
-                {length_map[detail_level]}
+                Create a high-depth 45-60 minute lesson plan in HINDI for Pages {start_p}-{end_p}.
+                Strictly follow this structure:
+                1. Learning Objectives: Use Bloom's Taxonomy (Analyze, Evaluate, Create).
+                2. 5E Model: Engage (Hook), Explore, Explain, Elaborate, Evaluate.
+                3. Panchadi Framework: Adhiti, Bodha, Abhyasa, Prayoga, Prasar.
+                4. Play-Based Activity: 1 specific classroom game related to the topic.
+                5. TLM (Teaching Learning Materials): List specific items needed.
+                6. Assessment: 3 questions to check understanding.
                 
-                Include:
-                1. Objectives (उद्देश्य)
-                2. Summary (सारांश)
-                3. Activity (गतिविधि)
+                Content: {context_text[:8000]}
                 
-                TEXT: {chapter_text[:8000]}
-                
-                At the very end, write 'SEARCH_QUERY: [Specific Topic Name in English]'
+                Format the end as: SEARCH_QUERY: [Specific Topic in English]
                 """
-                
+
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-4o-mini", 
                     messages=[{"role": "user", "content": prompt}]
                 )
                 
-                output = response.choices[0].message.content
-                
-                # Split Plan and Video Query
-                if "SEARCH_QUERY:" in output:
-                    plan, search_q = output.split("SEARCH_QUERY:")
-                else:
-                    plan, search_q = output, topic_name
+                full_output = response.choices[0].message.content
+                plan_text, search_query = full_output.split("SEARCH_QUERY:")
                 
                 # Fetch Video
-                video_url = find_hindi_video(search_q.strip(), youtube_key)
-                
-                # --- Display Results ---
-                col_left, col_right = st.columns([2, 1])
-                
-                with col_left:
-                    st.success("Lesson Plan Generated!")
-                    st.markdown(plan)
-                
-                with col_right:
-                    st.info("Recommended Video")
-                    if video_url:
-                        st.video(video_url)
-                        st.write(f"[Open in YouTube]({video_url})")
-                    else:
-                        st.write("No matching Hindi video found.")
+                video_link = find_youtube_video(search_query.strip(), youtube_key)
 
-else:
-    st.info("Waiting for PDF upload...")
+                # --- Results Display ---
+                res_col, vid_col = st.columns([2, 1])
+                
+                with res_col:
+                    st.subheader("📝 Deep Lesson Plan")
+                    st.markdown(plan_text)
+                    
+                    # PDF Download Feature
+                    pdf = LessonPDF()
+                    pdf.add_page()
+                    pdf.chapter_title(f"Lesson Plan: Page {start_p} to {end_p}")
+                    pdf.add_content(plan_text)
+                    pdf_output = pdf.output(dest='S').encode('latin-1', 'ignore')
+                    
+                    st.download_button(
+                        label="📥 Download Plan as PDF",
+                        data=pdf_output,
+                        file_name=f"Lesson_Plan_P{start_p}.pdf",
+                        mime="application/pdf"
+                    )
+
+                with vid_col:
+                    st.subheader("🎥 Visual Aid")
+                    if video_link:
+                        st.video(video_link)
+                    else:
+                        st.warning("No relevant Hindi video found.")
