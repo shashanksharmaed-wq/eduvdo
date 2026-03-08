@@ -2,3 +2,4 @@ streamlit
 pymupdf
 openai
 google-api-python-client
+fpdf
