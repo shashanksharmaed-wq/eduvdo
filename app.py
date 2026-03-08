@@ -5,7 +5,6 @@ from googleapiclient.discovery import build
 from fpdf import FPDF
 
 # --- 1. SECURE API LOADING ---
-# Automatically loads keys from Streamlit Cloud Secrets if configured
 OPENAI_KEY = st.secrets.get("OPENAI_API_KEY")
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY")
 
@@ -13,7 +12,7 @@ YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY")
 class ScriptedPDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 10)
-        self.cell(0, 10, 'Ultra-Scripted Teacher Guide - 60 Min Plan', 0, 1, 'R')
+        self.cell(0, 10, 'Premium Teacher Manual (60 Min)', 0, 1, 'R')
         self.ln(5)
         
     def chapter_title(self, title):
@@ -24,7 +23,6 @@ class ScriptedPDF(FPDF):
         
     def add_script_body(self, content):
         self.set_font('Arial', '', 11)
-        # We encode to latin-1 to prevent standard FPDF from crashing on regional characters
         clean_text = content.encode('latin-1', 'ignore').decode('latin-1')
         self.multi_cell(0, 7, clean_text)
         self.ln()
@@ -35,24 +33,20 @@ def find_educational_video(query, api_key, language):
         youtube = build('youtube', 'v3', developerKey=api_key)
         request = youtube.search().list(
             q=f"{query} educational lesson {language}",
-            part="snippet", 
-            type="video", 
-            maxResults=1
+            part="snippet", type="video", maxResults=1
         )
         response = request.execute()
         if response['items']:
             return f"https://www.youtube.com/watch?v={response['items'][0]['id']['videoId']}"
-    except Exception as e:
-        # Fails silently and safely if quota is reached or key is wrong
+    except Exception:
         pass
     return None
 
 # --- 4. APP INTERFACE & SETUP ---
-st.set_page_config(page_title="Ultra-Scripted Master Planner", layout="wide")
-st.title("🎭 Scripted Lesson Master Engine")
-st.markdown("### Minute-by-Minute Scripts | Mind Maps | Assessments | Age-Appropriate")
+st.set_page_config(page_title="Premium Curriculum Engine", layout="wide")
+st.title("🏆 Premium Curriculum Master Engine")
+st.markdown("### Surpassing LEAD & Chrysalis | High-Density Scripting | Micro-Teaching")
 
-# Fallback if Secrets are not configured
 if not OPENAI_KEY or not YOUTUBE_KEY:
     with st.sidebar:
         st.warning("⚠️ API Keys missing from Secrets. Please enter below:")
@@ -63,13 +57,11 @@ if not OPENAI_KEY or not YOUTUBE_KEY:
 uploaded_file = st.file_uploader("Upload Textbook (PDF)", type="pdf")
 
 if uploaded_file:
-    # Read PDF
     doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     total_pages = len(doc)
     
     st.info(f"📚 Total Book Pages: {total_pages} | Recommended Pacing: ~{round(total_pages/165, 1)} pages/day.")
 
-    # --- DEMOGRAPHICS & LANGUAGE CONTROLS ---
     st.divider()
     st.markdown("#### 🎯 Lesson Settings")
     col_lang, col_class, col_age = st.columns(3)
@@ -79,56 +71,64 @@ if uploaded_file:
     target_age = col_age.selectbox("Student Age Group", ["3-5 years", "6-8 years", "9-11 years", "12-14 years"])
 
     st.divider()
-    
-    # Select Page Range
     c1, c2 = st.columns(2)
     start_p = c1.number_input("Start Page", 1, total_pages, 1)
     end_p = c2.number_input("End Page (Optional)", start_p, total_pages, start_p)
 
-    if st.button(f"🚀 Generate {target_lang} Plan for {target_class}"):
+    if st.button(f"🚀 Generate Premium {target_lang} Manual for {target_class}"):
         if not OPENAI_KEY or not YOUTUBE_KEY:
-            st.error("API Keys required to proceed. Check sidebar or Streamlit Secrets.")
+            st.error("API Keys required to proceed.")
         else:
-            with st.spinner(f"Drafting age-appropriate {target_lang} Script, Mind Map, and Assessment for {target_age} olds..."):
+            with st.spinner(f"Writing High-Density Script... Integrating Micro-Teaching Skills..."):
                 
-                # Extract text from selected pages
                 text_context = ""
                 for i in range(start_p - 1, end_p):
                     text_context += doc[i].get_text()
                 
                 client = OpenAI(api_key=OPENAI_KEY)
                 
-                # THE MASTER PROMPT
+                # --- THE ULTIMATE MASTER PROMPT ---
                 prompt = f"""
-                You are an expert teacher. Create a MINUTE-BY-MINUTE scripted lesson plan (60 mins) in {target_lang.upper()} for students in {target_class} (Age: {target_age}).
+                You are a Master Curriculum Architect designing a premium teacher's manual that MUST SURPASS LEAD School, Chrysalis, and EDAC standards. 
+                Create a 60-minute lesson plan in {target_lang.upper()} for {target_class} (Age: {target_age}).
                 
-                CRITICAL INSTRUCTION: Ensure the vocabulary, tone, length of sentences, and complexity of games are strictly AGE-APPROPRIATE for {target_age} olds. Write the EXACT DIALOGUE for the teacher. Do not use generic instructions.
+                CRITICAL RULE ON TIME: You CANNOT have 15 minutes of time pass with only 2 lines of dialogue. For EVERY 5-minute block, you MUST write highly dense dialogue, actions, and questions that would physically take 5 minutes to say and do. 
                 
-                Structure:
-                1. (0-5 min) THE HOOK: Exact {target_lang} rhyme/story to grab the attention of {target_age} olds.
-                2. (5-15 min) DISCOVERY: 5 exact {target_lang} questions the teacher must ask, phrased for their cognitive level.
-                3. (15-40 min) CORE SCRIPT: Break into 5-min blocks ('Teacher Says:' / 'Teacher Does:').
-                4. (40-50 min) PLAY-BASED: A classroom game with explicit {target_lang} rules suitable for {target_class}.
-                5. (50-60 min) WRAP-UP & TLM: List specific local objects the teacher must bring/hold.
-                6. PANCHADI MAPPING: Show how the lesson hits Adhiti, Bodha, Abhyasa, Prayoga, Prasar.
-                7. MIND MAP / SUMMARY: Create a structured, text-based hierarchy (using bullets and arrows '->') summarizing the core concepts.
-                8. ASSESSMENT: Create a short age-appropriate quiz (3 MCQs, 2 Short Answer, 1 Creative Task) with an Answer Key.
-                
-                Book Text: {text_context[:8000]}
+                FORMAT EVERY CORE SCRIPT BLOCK EXACTLY LIKE THIS:
+                **[Time Marker: e.g., Minute 15 - 18]**
+                * **Teacher Does:** [Exact physical action]
+                * **Teacher Says ({target_lang}):** "[Minimum 4 to 5 full sentences of exact dialogue]"
+                * **Anticipated Student Response:** "[What the kids will say]"
+                * **Remediation:** "[What to say if the kids get it wrong]"
+                * **Board Work:** "[Exactly what to write/draw on the blackboard right now]"
+                * **Micro-Teaching Skill Applied:** "[Name the specific teaching skill used here, e.g., Skill of Reinforcement]"
+
+                FULL LESSON STRUCTURE:
+                1. MICRO-TEACHING FOCUS: List 2 specific micro-teaching skills (e.g., Skill of Probing Questions, Skill of Stimulus Variation) for the teacher to practice today and a quick 1-sentence tip for each.
+                2. THE HOOK (Min 0-5): A full 4-8 line {target_lang} rhyme or detailed 2-minute story to grab {target_age} olds. Include physical actions.
+                3. DISCOVERY & PRE-ASSESSMENT (Min 5-15): Provide 5 deep questions using the format above.
+                4. CORE INSTRUCTION (Min 15-40): Break this into strictly 3-to-4 minute micro-blocks. YOU MUST FILL THE TIME WITH DIALOGUE. Use the format above for EVERY block.
+                5. PLAY-BASED ACTIVITY (Min 40-52): Explicit {target_lang} game rules. Step 1, Step 2, Step 3. What the teacher says to start the game.
+                6. WRAP-UP & TLM (Min 52-60): Specific local items needed. Final concluding dialogue.
+                7. PEDAGOGY MAPPING: Show Adhiti, Bodha, Abhyasa, Prayoga, Prasar.
+                8. MIND MAP: Bulleted text hierarchy (->) summarizing the lesson.
+                9. BOARD SNAPSHOT & ASSESSMENT: 3 MCQs, 2 Short Answers, 1 Creative Task.
+
+                Book Text Context: {text_context[:8000]}
                 
                 End with this exact tag format:
                 SEARCH_QUERY: [Specific Topic in English]
                 """
 
-                # Call AI
+                # Using gpt-4o for maximum instruction following and verbose output
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini", 
-                    messages=[{"role": "user", "content": prompt}]
+                    model="gpt-4o", 
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=4000 
                 )
                 
                 full_output = response.choices[0].message.content
                 
-                # CRASH-PROOF LOGIC
                 if "SEARCH_QUERY:" in full_output:
                     parts = full_output.split("SEARCH_QUERY:")
                     plan_content = parts[0].strip()
@@ -137,7 +137,6 @@ if uploaded_file:
                     plan_content = full_output
                     video_query = f"Topic page {start_p} lesson"
 
-                # Fetch Localized Video
                 v_url = find_educational_video(video_query, YOUTUBE_KEY, target_lang)
                 
                 # --- 6. UI DISPLAY ---
@@ -145,23 +144,21 @@ if uploaded_file:
                 col_plan, col_vid = st.columns([2, 1])
                 
                 with col_plan:
-                    st.success("Age-Appropriate Lesson Script Ready!")
+                    st.success("High-Density Premium Manual Ready!")
                     st.markdown(plan_content)
                     
-                    # PDF Download Button
                     pdf = ScriptedPDF()
                     pdf.add_page()
-                    pdf.chapter_title(f"Detailed Script: Pages {start_p}-{end_p} ({target_class})")
+                    pdf.chapter_title(f"Premium Script: Pages {start_p}-{end_p} ({target_class})")
                     pdf.add_script_body(plan_content)
                     pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
                     
                     st.download_button(
-                        label="📥 Download Scripted PDF", 
+                        label="📥 Download Premium PDF", 
                         data=pdf_bytes, 
-                        file_name=f"{target_class}_Script_P{start_p}.pdf"
+                        file_name=f"Premium_Script_{target_class}_P{start_p}.pdf"
                     )
-                    
-                    st.caption("💡 **Pro Tip for Regional Fonts:** If the downloaded PDF shows weird characters instead of your selected language, skip the download button and press **Ctrl + P** (or Cmd + P on Mac) to print this web page directly as a PDF. It preserves all regional fonts perfectly!")
+                    st.caption("💡 Tip: Use **Ctrl + P** on this webpage to print/save perfectly with regional Hindi/Marathi fonts!")
 
                 with col_vid:
                     st.info(f"Classroom Video Aid ({target_lang})")
@@ -169,6 +166,6 @@ if uploaded_file:
                         st.video(v_url)
                         st.write(f"[Open on YouTube]({v_url})")
                     else:
-                        st.warning(f"No matching {target_lang} educational video found.")
+                        st.warning("No matching educational video found.")
 else:
     st.info("Waiting for textbook PDF upload...")
