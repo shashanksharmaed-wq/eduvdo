@@ -3,66 +3,145 @@ import fitz  # PyMuPDF
 from openai import OpenAI
 from googleapiclient.discovery import build
 
-st.set_page_config(page_title="Chapter-Wise AI Planner", layout="wide")
-st.title("📖 Chapter-Specific Lesson Planner")
+# --- Page Configuration ---
+st.set_page_config(page_title="Hindi AI School Planner", layout="wide")
+st.title("📚 AI Lesson Planner (हिंदी)")
 
-# --- Setup Sidebar ---
+# --- Sidebar Configuration ---
 with st.sidebar:
+    st.header("🔑 API Setup")
     openai_key = st.text_input("OpenAI API Key", type="password")
     youtube_key = st.text_input("YouTube API Key", type="password")
+    st.divider()
+    
+    st.header("⚙️ Plan Settings")
+    # Control the length/detail of the lesson plan
+    detail_level = st.select_slider(
+        "Select Detail Level (विस्तार स्तर):",
+        options=["Brief", "Standard", "Comprehensive"],
+        value="Standard"
+    )
+    
+    length_map = {
+        "Brief": "Keep it short (max 200 words). Focus on 3 main points only.",
+        "Standard": "Provide a balanced 1-page plan with summary and activity.",
+        "Comprehensive": "Detailed 3-page style plan with minute-by-minute breakdown and 5 quiz questions."
+    }
 
-# --- Functions ---
-def get_chapters(pdf_file):
+# --- Core Functions ---
+def get_pdf_structure(pdf_file):
+    """Detects Chapters or provides a way to read pages."""
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    toc = doc.get_toc() # This grabs the Table of Contents
-    if not toc:
-        return None, doc
-    # Format chapters: "Chapter Name (Page X)"
-    chapters = [{"title": t, "page": p - 1} for lvl, t, p in toc if lvl == 1]
-    return chapters, doc
+    toc = doc.get_toc() # Table of Contents
+    if toc:
+        chapters = [{"title": f"Ch {lvl}: {t}", "page": p - 1} for lvl, t, p in toc if lvl <= 2]
+        return chapters, doc
+    return None, doc
 
-def find_youtube_video(query, api_key):
-    youtube = build('youtube', 'v3', developerKey=api_key)
-    request = youtube.search().list(q=query + " lesson", part="snippet", type="video", maxResults=1)
-    response = request.execute()
-    return f"https://www.youtube.com/watch?v={response['items'][0]['id']['videoId']}" if response['items'] else None
+def find_hindi_video(query, api_key):
+    """Searches YouTube for Hindi educational content."""
+    try:
+        youtube = build('youtube', 'v3', developerKey=api_key)
+        search_query = f"{query} educational lesson in Hindi"
+        request = youtube.search().list(
+            q=search_query,
+            part="snippet",
+            type="video",
+            relevanceLanguage="hi",
+            maxResults=1
+        )
+        response = request.execute()
+        if response['items']:
+            video_id = response['items'][0]['id']['videoId']
+            return f"https://www.youtube.com/watch?v={video_id}"
+    except Exception as e:
+        st.error(f"YouTube Error: {e}")
+    return None
 
-# --- App Interface ---
-uploaded_file = st.file_uploader("Upload School Book", type="pdf")
+# --- Main App Logic ---
+uploaded_file = st.file_uploader("Upload School Book (PDF)", type="pdf")
 
 if uploaded_file:
-    chapters, doc = get_chapters(uploaded_file)
+    chapters, doc = get_pdf_structure(uploaded_file)
     
-    if chapters:
-        # User selects which chapter to process
-        selected_chapter = st.selectbox("Select a Chapter", chapters, format_func=lambda x: x['title'])
-        
-        if st.button("Generate Plan for this Chapter"):
-            if not openai_key or not youtube_key:
-                st.error("Please enter API keys first!")
-            else:
-                with st.spinner("Analyzing chapter..."):
-                    # Extract text ONLY for that chapter (up to 10 pages)
-                    start_page = selected_chapter['page']
-                    chapter_text = ""
-                    for i in range(start_page, min(start_page + 10, len(doc))):
-                        chapter_text += doc[i].get_text()
+    # Selection Mode
+    st.divider()
+    mode = st.radio("How would you like to select the content?", ["Select Chapter", "Manual Page Range"])
+    
+    chapter_text = ""
+    topic_name = ""
 
-                    # AI Call
-                    client = OpenAI(api_key=openai_key)
-                    prompt = f"Create a lesson plan for the chapter: {selected_chapter['title']}. Content: {chapter_text[:8000]}. End with 'SEARCH_QUERY: [topic]'"
-                    response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
-                    
-                    full_res = response.choices[0].message.content
-                    plan, query = full_res.split("SEARCH_QUERY:")
-                    
-                    # Video Search
-                    video_url = find_youtube_video(query.strip(), youtube_key)
-
-                    # Result Display
-                    c1, c2 = st.columns(2)
-                    with c1: st.markdown(plan)
-                    with c2: 
-                        if video_url: st.video(video_url)
+    if mode == "Select Chapter" and chapters:
+        selected = st.selectbox("Choose a Chapter:", chapters, format_func=lambda x: x['title'])
+        topic_name = selected['title']
+        start_p = selected['page']
+        # Read up to 8 pages from chapter start
+        for i in range(start_p, min(start_p + 8, len(doc))):
+            chapter_text += doc[i].get_text()
     else:
-        st.warning("No Table of Contents found in this PDF. Try a different book.")
+        if mode == "Select Chapter":
+            st.warning("No Table of Contents found. Using Manual Page Range instead.")
+        
+        c1, c2 = st.columns(2)
+        start_page = c1.number_input("Start Page", 1, len(doc), 1)
+        end_page = c2.number_input("End Page", 1, len(doc), min(start_page + 5, len(doc)))
+        topic_name = f"Pages {start_page} to {end_page}"
+        for i in range(start_page - 1, end_page):
+            chapter_text += doc[i].get_text()
+
+    # --- Generation Trigger ---
+    if st.button("Generate Hindi Lesson Plan & Video"):
+        if not openai_key or not youtube_key:
+            st.error("Please enter both API keys in the sidebar!")
+        else:
+            with st.spinner("Processing PDF and searching for videos..."):
+                client = OpenAI(api_key=openai_key)
+                
+                # Instruction to AI
+                prompt = f"""
+                You are a professional teacher. Based on the text below, create a {detail_level} lesson plan in HINDI.
+                {length_map[detail_level]}
+                
+                Include:
+                1. Objectives (उद्देश्य)
+                2. Summary (सारांश)
+                3. Activity (गतिविधि)
+                
+                TEXT: {chapter_text[:8000]}
+                
+                At the very end, write 'SEARCH_QUERY: [Specific Topic Name in English]'
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                
+                output = response.choices[0].message.content
+                
+                # Split Plan and Video Query
+                if "SEARCH_QUERY:" in output:
+                    plan, search_q = output.split("SEARCH_QUERY:")
+                else:
+                    plan, search_q = output, topic_name
+                
+                # Fetch Video
+                video_url = find_hindi_video(search_q.strip(), youtube_key)
+                
+                # --- Display Results ---
+                col_left, col_right = st.columns([2, 1])
+                
+                with col_left:
+                    st.success("Lesson Plan Generated!")
+                    st.markdown(plan)
+                
+                with col_right:
+                    st.info("Recommended Video")
+                    if video_url:
+                        st.video(video_url)
+                        st.write(f"[Open in YouTube]({video_url})")
+                    else:
+                        st.write("No matching Hindi video found.")
+
+else:
+    st.info("Waiting for PDF upload...")
